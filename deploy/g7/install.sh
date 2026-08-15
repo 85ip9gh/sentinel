@@ -49,7 +49,15 @@ cp "$REPO_ROOT/requirements.txt" "$PREFIX/requirements.txt"
 chown -R "$SERVICE_USER:$SERVICE_USER" "$PREFIX/collector" "$PREFIX/requirements.txt"
 
 echo "==> virtualenv"
-if [[ ! -x "$PREFIX/.venv/bin/python" ]]; then
+# Test for pip rather than python. A venv created while python3-venv was
+# missing leaves a directory with an interpreter and no pip in it, and testing
+# for the interpreter alone would skip creation and fail later on the install.
+if [[ ! -x "$PREFIX/.venv/bin/pip" ]]; then
+  if ! python3 -c "import ensurepip" >/dev/null 2>&1; then
+    echo "python3-venv is missing. Install it with: sudo apt-get install -y python3-venv" >&2
+    exit 1
+  fi
+  rm -rf "$PREFIX/.venv"
   python3 -m venv "$PREFIX/.venv"
 fi
 "$PREFIX/.venv/bin/pip" install --quiet --upgrade pip

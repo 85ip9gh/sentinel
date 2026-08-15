@@ -29,7 +29,10 @@ services:
       # port, DOCKER is for containers on this compose network, and TAILNET is
       # for collectors on other machines.
       KAFKA_LISTENERS: HOST://:9092,TAILNET://:9094,DOCKER://:9095,CONTROLLER://:9093
-      KAFKA_ADVERTISED_LISTENERS: HOST://localhost:9092,TAILNET://${SENTINEL_TAILNET_IP}:9094,DOCKER://kafka:9095
+      # HOST advertises 127.0.0.1 rather than localhost, because a Windows
+      # client resolves localhost to ::1 first and the published port is IPv4
+      # only, so every connection paid a two second timeout before falling back.
+      KAFKA_ADVERTISED_LISTENERS: HOST://127.0.0.1:9092,TAILNET://${SENTINEL_TAILNET_IP}:9094,DOCKER://kafka:9095
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: HOST:PLAINTEXT,TAILNET:PLAINTEXT,DOCKER:PLAINTEXT,CONTROLLER:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: DOCKER
       KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER

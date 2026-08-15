@@ -17,16 +17,25 @@ _SKIP_FSTYPES = {"squashfs", "tmpfs", "devtmpfs", "overlay", "ramfs", "autofs"}
 
 def _disks() -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
+    # One entry per underlying device. A hardened systemd unit sees the same
+    # filesystem several times over through its bind mounts, and reporting /,
+    # /tmp, /var/tmp and the service state directory as four separate disks at
+    # an identical percentage would corrupt any average taken over them later.
+    seen: set[str] = set()
     for part in psutil.disk_partitions(all=False):
         if part.fstype.lower() in _SKIP_FSTYPES:
+            continue
+        if part.device in seen:
             continue
         try:
             usage = psutil.disk_usage(part.mountpoint)
         except (PermissionError, OSError):
             # Empty optical drives and unreadable mounts, not worth an error.
             continue
+        seen.add(part.device)
         out.append(
             {
+                "device": part.device,
                 "mount": part.mountpoint,
                 "fstype": part.fstype,
                 "total_bytes": usage.total,
