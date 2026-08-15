@@ -8,8 +8,9 @@ host, and an AI agent investigates the readings that do not fit: it queries the
 history, pulls the logs from that minute, runs read-only checks against the
 host, and writes an incident report with its evidence attached.
 
-**Status: step 1 of 5.** Collectors and Kafka only. Nothing intelligent is
-wired up yet, and the storage and agent layers do not exist.
+**Status: step 1 of 5, running.** Two hosts publish into Kafka every ten
+seconds. Nothing intelligent is wired up yet, and the storage and agent layers
+do not exist.
 
 ## Why
 
@@ -92,14 +93,27 @@ Every setting is an environment variable with a working default.
 | `SENTINEL_SPOOL_MAX_BYTES` | `67108864` | Spool cap per topic. Oldest readings are dropped first |
 | `SENTINEL_FLUSH_TIMEOUT` | `5` | Seconds to wait for delivery confirmation each cycle |
 
-## Deploying a collector to a Linux host
+## Deploying a collector
+
+**Linux, under systemd:**
 
 ```
-deploy/g7/install.sh --bootstrap 100.x.x.x:9094 --role server
+sudo deploy/g7/install.sh --bootstrap 100.x.x.x:9094 --role server
 ```
 
 Installs into `/opt/sentinel`, runs as a dedicated unprivileged `sentinel` user
-under systemd, and spools to `/var/lib/sentinel/spool`.
+under `ProtectSystem=strict`, and spools to `/var/lib/sentinel/spool`. Needs
+`python3-venv`, which is not installed by default on Ubuntu Server.
+
+**Windows, as a scheduled task:**
+
+```
+powershell -ExecutionPolicy Bypass -File deploy\windows\install-task.ps1
+```
+
+Registered for the current user and started at logon, so no elevation is
+needed. Docker Desktop also starts at logon and takes longer, which the spool
+covers.
 
 ## Tests
 

@@ -14,6 +14,35 @@ def test_system_collect_returns_the_expected_shape():
     json.dumps(data)
 
 
+def test_one_filesystem_is_reported_once_however_many_times_it_is_mounted(monkeypatch):
+    """A hardened systemd unit sees the root filesystem through several bind mounts."""
+
+    class Part:
+        def __init__(self, device, mountpoint, fstype):
+            self.device = device
+            self.mountpoint = mountpoint
+            self.fstype = fstype
+
+    parts = [
+        Part("/dev/mapper/vg-root", "/", "ext4"),
+        Part("/dev/mapper/vg-root", "/tmp", "ext4"),
+        Part("/dev/mapper/vg-root", "/var/lib/sentinel", "ext4"),
+        Part("/dev/sda2", "/boot", "ext4"),
+        Part("tmpfs", "/run", "tmpfs"),
+    ]
+    class Usage:
+        total = 250_000_000_000
+        used = 20_000_000_000
+        percent = 8.1
+
+    monkeypatch.setattr(system.psutil, "disk_partitions", lambda all=False: parts)
+    monkeypatch.setattr(system.psutil, "disk_usage", lambda mount: Usage())
+
+    disks = system._disks()
+
+    assert [d["mount"] for d in disks] == ["/", "/boot"]
+
+
 def test_http_check_reports_a_healthy_response():
     class Response:
         status_code = 200
