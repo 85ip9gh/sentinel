@@ -1,0 +1,28 @@
+[Unit]
+Description=Sentinel telemetry collector
+Documentation=https://github.com/85ip9gh/sentinel
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=sentinel
+Group=sentinel
+WorkingDirectory=/opt/sentinel
+EnvironmentFile=/etc/sentinel/collector.env
+ExecStart=/opt/sentinel/.venv/bin/python -m collector
+Restart=always
+RestartSec=10
+
+# The collector reads metrics and writes to its own spool. Nothing else.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+ReadWritePaths=/var/lib/sentinel
+
+[Install]
+WantedBy=multi-user.target
