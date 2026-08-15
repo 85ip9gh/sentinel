@@ -8,9 +8,10 @@ host, and an AI agent investigates the readings that do not fit: it queries the
 history, pulls the logs from that minute, runs read-only checks against the
 host, and writes an incident report with its evidence attached.
 
-**Status: step 1 of 5, running.** Two hosts publish into Kafka every ten
-seconds. Nothing intelligent is wired up yet, and the storage and agent layers
-do not exist.
+**Status: step 2 of 5, running.** Two hosts publish into Kafka every ten
+seconds, a sink lands every reading in HDFS partitioned by day, and a dashboard
+serves the archive back. Nothing intelligent is wired up yet: there is no
+baseline, no anomaly detection and no agent.
 
 ## Why
 
@@ -33,6 +34,38 @@ Each host runs a collector that publishes to three topics:
 Every message is JSON keyed by host name, so a machine's readings stay ordered
 relative to its own history.
 
+## What step 2 does
+
+A sink consumes all three topics and writes them into HDFS as newline-delimited
+JSON, one immutable file per batch:
+
+```
+/sentinel/raw/<kind>/dt=<YYYY-MM-DD>/part-<timestamp>-<token>.ndjson
+```
+
+**Partitioning is by the reading's own timestamp, not by arrival.** A collector
+that spent six hours spooled writes into the days it observed, so replaying a
+backlog repairs history instead of stacking it onto the day the broker came
+back. A reading whose timestamp cannot be parsed goes to `dt=unknown` rather
+than being dropped or quietly filed under today.
+
+**Offsets are committed after the files land, never before.** A crash in
+between replays those readings and writes them again under a new name.
+Duplicates are removable later by host, kind and timestamp. A gap in the
+archive is not.
+
+Files are written once and never appended to. Appending over WebHDFS would mean
+a network round trip per reading and a partially written file after any crash.
+
+### The dashboard
+
+`http://127.0.0.1:8088` serves the archive: a card per host with its freshness,
+the newest site check per URL, container counts, and what the archive actually
+holds. It reads HDFS and deliberately not Kafka. A page served from the stream
+would look identical whether or not anything had been stored, so it would prove
+nothing. The cost is that readings appear one sink batch late, which is why
+every row carries its own age.
+
 ### The spool is the point
 
 The broker runs on a workstation that is not on all the time. A collector that
@@ -45,17 +78,28 @@ deleting readings whose failure has not been reported yet.
 
 ## Running it
 
-### Broker
+### The stack
 
 ```
 cp docker/.env.example docker/.env      # set SENTINEL_TAILNET_IP
-docker compose -f docker/compose.yml up -d
+docker compose -f docker/compose.yml up -d --build
 ```
 
-The broker publishes two listeners: `127.0.0.1:9092` for local clients and
-`<tailnet-ip>:9094` for remote collectors. The tailnet binding is explicit and
-Compose refuses to start without it, because an empty value would bind `0.0.0.0`
-and put an unauthenticated broker on the LAN.
+Brings up Kafka, a single-node HDFS (NameNode plus DataNode), the sink and the
+dashboard. The NameNode UI is on `127.0.0.1:9870` and the dashboard on
+`127.0.0.1:8088`, both loopback only.
+
+The broker publishes three listeners, because a Kafka client is told to
+reconnect to the *advertised* address and the three kinds of client sit in
+different networks: `127.0.0.1:9092` for processes on this machine,
+`kafka:9095` for containers on the compose network, and `<tailnet-ip>:9094`
+for collectors on other machines. The tailnet binding is explicit and Compose
+refuses to start without it, because an empty value would bind `0.0.0.0` and
+put an unauthenticated broker on the LAN.
+
+The sink and the dashboard run inside the compose network on purpose. A WebHDFS
+write is redirected from the NameNode to a DataNode by hostname, so a client
+outside the network gets an address it cannot resolve.
 
 ### Collector
 
@@ -93,6 +137,17 @@ Every setting is an environment variable with a working default.
 | `SENTINEL_SPOOL_MAX_BYTES` | `67108864` | Spool cap per topic. Oldest readings are dropped first |
 | `SENTINEL_FLUSH_TIMEOUT` | `5` | Seconds to wait for delivery confirmation each cycle |
 
+Sink and dashboard:
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `SENTINEL_HDFS_URL` | `http://namenode:9870` | WebHDFS endpoint |
+| `SENTINEL_HDFS_ROOT` | `/sentinel/raw` | Root of the raw archive |
+| `SENTINEL_SINK_GROUP` | `sentinel-hdfs-sink` | Consumer group. Reset it to replay the whole retained log |
+| `SENTINEL_SINK_BATCH_RECORDS` | `500` | Close a batch at this many readings |
+| `SENTINEL_SINK_BATCH_SECONDS` | `60` | Close a batch at this age, so a quiet topic still lands |
+| `SENTINEL_DASHBOARD_PORT` | `8088` | Dashboard listen port |
+
 ## Deploying a collector
 
 **Linux, under systemd:**
@@ -122,15 +177,17 @@ pip install -r requirements-dev.txt
 pytest
 ```
 
-No Kafka, no network and no docker daemon are required. The producer, the
-sources and the loop are all injected, so the suite covers the failure paths
-that matter: a dead broker, a full local queue, a replay that fails again, a
-source that raises, and a spool over its cap.
+No Kafka, no HDFS, no network and no docker daemon are required. The producer,
+the consumer, the writer and the clocks are all injected, so the suite covers
+the failure paths that matter: a dead broker, a full local queue, a replay that
+fails again, a source that raises, a spool over its cap, a batch spanning two
+days, a failed HDFS write leaving offsets uncommitted, and a reading with no
+usable timestamp.
 
 ## Roadmap
 
 1. **Collectors and Kafka.** Done.
-2. HDFS sink writing day partitions, plus a plain dashboard over recent data.
+2. **HDFS sink writing day partitions, plus a dashboard over the archive.** Done.
 3. Spark on YARN for daily rollups and per-host, per-hour baselines.
 4. The agent: trigger rules, investigation tools, incident reports.
 5. Public dashboard.

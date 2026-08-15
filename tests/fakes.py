@@ -57,6 +57,65 @@ class FakeProducer:
         self.deliver = False
 
 
+class FakeWriter:
+    """In-memory stand-in for HDFS, keyed by full path."""
+
+    def __init__(self, fail_on: str | None = None) -> None:
+        self.files: dict[str, str] = {}
+        self.fail_on = fail_on
+
+    def write(self, path: str, body: str) -> None:
+        if self.fail_on and self.fail_on in path:
+            raise OSError("datanode unavailable")
+        if path in self.files:
+            raise FileExistsError(path)
+        self.files[path] = body
+
+    def listing(self, path: str) -> list[str]:
+        prefix = path.rstrip("/") + "/"
+        names = {
+            key[len(prefix) :].split("/", 1)[0]
+            for key in self.files
+            if key.startswith(prefix)
+        }
+        return sorted(names)
+
+    def read(self, path: str) -> str:
+        return self.files[path]
+
+
+class FakeMessage:
+    def __init__(self, topic: str, value: str, err=None) -> None:
+        self._topic = topic
+        self._value = value.encode("utf-8")
+        self._error = err
+
+    def topic(self):
+        return self._topic
+
+    def value(self):
+        return self._value
+
+    def error(self):
+        return self._error
+
+
+class FakeConsumer:
+    def __init__(self, messages: list | None = None) -> None:
+        self.queue = list(messages or [])
+        self.commits = 0
+        self.closed = False
+
+    def poll(self, timeout):
+        return self.queue.pop(0) if self.queue else None
+
+    def commit(self, asynchronous=False):
+        self.commits += 1
+
+    def close(self):
+        self.closed = True
+
+
 class FakePublisher:
     """Records what the runner asks to publish."""
 
