@@ -27,8 +27,10 @@ def _default_runner(command: list[str]) -> str:
     return result.stdout
 
 
-def available(which: Callable[[str], str | None] = shutil.which) -> bool:
-    return which("docker") is not None
+def available() -> bool:
+    # Looked up through the module rather than bound as a default argument, so
+    # the lookup happens at call time and stays patchable in tests.
+    return shutil.which("docker") is not None
 
 
 def collect(runner: Runner | None = None, check_available: bool = True) -> list[dict[str, Any]]:

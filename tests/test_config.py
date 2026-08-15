@@ -5,7 +5,7 @@ from collector.config import TOPICS, Config
 
 def test_defaults_need_no_environment():
     config = Config.from_env({})
-    assert config.bootstrap == "localhost:9092"
+    assert config.bootstrap == "127.0.0.1:9092"
     assert config.system_interval == 10.0
     assert config.http_targets == ()
     assert config.host
@@ -30,7 +30,7 @@ def test_values_come_from_the_environment():
 
 def test_blank_values_fall_back_to_defaults():
     config = Config.from_env({"SENTINEL_BOOTSTRAP": "   ", "SENTINEL_SYSTEM_INTERVAL": ""})
-    assert config.bootstrap == "localhost:9092"
+    assert config.bootstrap == "127.0.0.1:9092"
     assert config.system_interval == 10.0
 
 

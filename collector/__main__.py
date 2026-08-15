@@ -53,6 +53,7 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.once:
         produced = runner.cycle()
+        publisher.close()
         logging.info(
             "one cycle: %d readings, %d delivered, %d failed",
             produced,
@@ -64,7 +65,10 @@ def main(argv: list[str] | None = None) -> int:
     stop = threading.Event()
     for sig in (signal.SIGINT, signal.SIGTERM):
         signal.signal(sig, lambda *_: stop.set())
-    runner.run(stop)
+    try:
+        runner.run(stop)
+    finally:
+        publisher.close()
     return 0
 
 
