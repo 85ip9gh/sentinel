@@ -75,5 +75,89 @@ services:
         done
         /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9095 --list
 
+  namenode:
+    build:
+      context: ./hadoop
+      args:
+        HADOOP_VERSION: ${HADOOP_VERSION:-3.4.1}
+    image: sentinel/hadoop:${HADOOP_VERSION:-3.4.1}
+    container_name: sentinel-namenode
+    hostname: namenode
+    restart: unless-stopped
+    command: ["hdfs", "namenode"]
+    env_file: ./hadoop.env
+    environment:
+      # The image formats only when this path is absent, so it points at the
+      # directory that formatting itself creates. Pointing it at the volume root
+      # would never format, because the volume root always exists.
+      ENSURE_NAMENODE_DIR: /hadoop/dfs/name/current
+    ports:
+      # The NameNode web UI and WebHDFS, on loopback only.
+      - "127.0.0.1:9870:9870"
+    volumes:
+      - namenode-data:/hadoop/dfs/name
+    healthcheck:
+      test: ["CMD-SHELL", "timeout 2 bash -c '</dev/tcp/localhost/9870'"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  datanode:
+    build:
+      context: ./hadoop
+      args:
+        HADOOP_VERSION: ${HADOOP_VERSION:-3.4.1}
+    image: sentinel/hadoop:${HADOOP_VERSION:-3.4.1}
+    container_name: sentinel-datanode
+    hostname: datanode
+    restart: unless-stopped
+    command: ["hdfs", "datanode"]
+    env_file: ./hadoop.env
+    depends_on:
+      namenode:
+        condition: service_healthy
+    volumes:
+      - datanode-data:/hadoop/dfs/data
+
+  sink:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    image: sentinel/python:0.2.0
+    container_name: sentinel-sink
+    restart: unless-stopped
+    command: ["python", "-m", "sink"]
+    environment:
+      # Inside the compose network, so the DOCKER listener and the DataNode
+      # hostname both resolve. A WebHDFS write is redirected from the NameNode
+      # to a DataNode by name, which is why the sink lives in here.
+      SENTINEL_BOOTSTRAP: kafka:9095
+      SENTINEL_HDFS_URL: http://namenode:9870
+      SENTINEL_HDFS_ROOT: /sentinel/raw
+    depends_on:
+      kafka:
+        condition: service_healthy
+      namenode:
+        condition: service_healthy
+
+  dashboard:
+    image: sentinel/python:0.2.0
+    container_name: sentinel-dashboard
+    restart: unless-stopped
+    command: ["python", "-m", "dashboard"]
+    environment:
+      SENTINEL_HDFS_URL: http://namenode:9870
+      SENTINEL_HDFS_ROOT: /sentinel/raw
+    ports:
+      - "127.0.0.1:8088:8088"
+    depends_on:
+      namenode:
+        condition: service_healthy
+      sink:
+        condition: service_started
+
 volumes:
   kafka-data:
+  namenode-data:
+  datanode-data:
