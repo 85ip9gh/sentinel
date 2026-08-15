@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="refresh" content="30">
+<title>Sentinel</title>
+<style>
+  :root {
+    --bg: #fbfbf9; --panel: #ffffff; --ink: #1a1a1a; --muted: #6b6b6b;
+    --line: #e4e4e0; --ok: #1f7a4d; --late: #96690d; --bad: #a3281f;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #121212; --panel: #1a1a1a; --ink: #ededed; --muted: #9a9a9a;
+      --line: #2c2c2c; --ok: #4fbf85; --late: #d4a029; --bad: #e2685c;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 2rem 1.25rem; background: var(--bg); color: var(--ink);
+    font: 15px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  main { max-width: 1080px; margin: 0 auto; }
+  h1 { font-size: 1.35rem; margin: 0; letter-spacing: -0.01em; }
+  h2 { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.08em;
+       color: var(--muted); margin: 2.25rem 0 0.75rem; font-weight: 600; }
+  header { display: flex; justify-content: space-between; align-items: baseline;
+           gap: 1rem; flex-wrap: wrap; border-bottom: 1px solid var(--line);
+           padding-bottom: 0.75rem; }
+  .sub { color: var(--muted); font-size: 0.8rem; font-variant-numeric: tabular-nums; }
+  .grid { display: grid; gap: 0.75rem; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 1rem; }
+  .card-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; }
+  .name { font-weight: 600; }
+  .role { color: var(--muted); font-size: 0.78rem; }
+  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 0.4rem; }
+  .fresh .dot, .fresh { color: var(--ok); }
+  .late .dot, .late { color: var(--late); }
+  .stale .dot, .stale, .unknown .dot, .unknown { color: var(--bad); }
+  .fresh .dot { background: var(--ok); }
+  .late .dot { background: var(--late); }
+  .stale .dot, .unknown .dot { background: var(--bad); }
+  .badge { font-size: 0.75rem; font-variant-numeric: tabular-nums; }
+  dl { display: grid; grid-template-columns: auto 1fr; gap: 0.3rem 1rem; margin: 0; font-size: 0.85rem; }
+  dt { color: var(--muted); }
+  dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; }
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+  th { text-align: left; font-weight: 600; color: var(--muted); font-size: 0.75rem;
+       text-transform: uppercase; letter-spacing: 0.05em; padding: 0.5rem 0.75rem 0.5rem 0; }
+  td { padding: 0.5rem 0.75rem 0.5rem 0; border-top: 1px solid var(--line);
+       font-variant-numeric: tabular-nums; }
+  td.url { font-variant-numeric: normal; word-break: break-all; }
+  .empty { color: var(--muted); font-size: 0.85rem; padding: 1rem 0; }
+  footer { margin-top: 2.5rem; padding-top: 1rem; border-top: 1px solid var(--line);
+           color: var(--muted); font-size: 0.78rem; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Sentinel</h1>
+    <div class="sub">generated {{ generated_at }} &middot; refreshes every 30s</div>
+  </header>
+
+  <h2>Hosts</h2>
+  {% if hosts %}
+  <div class="grid">
+    {% for h in hosts %}
+    <section class="card">
+      <div class="card-head">
+        <div>
+          <div class="name">{{ h.host }}</div>
+          <div class="role">{{ h.role }}</div>
+        </div>
+        <div class="badge {{ h.freshness }}">
+          <span class="dot"></span>{% if h.age_seconds is not none %}{{ h.age_seconds }}s ago{% else %}no timestamp{% endif %}
+        </div>
+      </div>
+      <dl>
+        <dt>CPU</dt><dd>{{ h.cpu_percent }}%{% if h.load_avg %} &middot; load {{ h.load_avg[0] }}{% endif %}</dd>
+        <dt>Memory</dt><dd>{{ h.memory_percent }}%{% if h.memory_available_gb %} &middot; {{ h.memory_available_gb }} GB free{% endif %}</dd>
+        {% if h.disk_worst %}<dt>Disk {{ h.disk_worst.mount }}</dt><dd>{{ h.disk_worst.percent }}%</dd>{% endif %}
+        {% if h.temperature_max %}<dt>Peak temp</dt><dd>{{ h.temperature_max }} &deg;C</dd>{% endif %}
+        <dt>Uptime</dt><dd>{{ h.uptime_days }} d</dd>
+        <dt>Processes</dt><dd>{{ h.process_count }}</dd>
+      </dl>
+    </section>
+    {% endfor %}
+  </div>
+  {% else %}
+  <p class="empty">No host readings in the archive yet.</p>
+  {% endif %}
+
+  <h2>Site checks</h2>
+  {% if checks %}
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>URL</th><th>From</th><th>Status</th><th>Latency</th><th>Age</th></tr></thead>
+      <tbody>
+        {% for c in checks %}
+        <tr>
+          <td class="url">{{ c.url }}</td>
+          <td>{{ c.host }}</td>
+          <td class="{{ 'fresh' if c.ok else 'stale' }}">{{ c.status or c.error or 'no response' }}</td>
+          <td>{{ c.latency_ms }} ms</td>
+          <td>{{ c.age_seconds }}s</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="empty">No site checks in the archive yet.</p>
+  {% endif %}
+
+  {% if containers %}
+  <h2>Containers</h2>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Host</th><th>Running</th><th>Known</th></tr></thead>
+      <tbody>
+        {% for c in containers %}
+        <tr><td>{{ c.host }}</td><td>{{ c.running }}</td><td>{{ c.total }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+
+  <h2>Archive</h2>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Kind</th><th>Days</th><th>Oldest</th><th>Newest</th><th>Files today</th></tr></thead>
+      <tbody>
+        {% for a in archive %}
+        <tr>
+          <td>{{ a.kind }}</td>
+          <td>{{ a.days }}</td>
+          <td>{{ a.oldest or '&mdash;' | safe }}</td>
+          <td>{{ a.newest or '&mdash;' | safe }}</td>
+          <td>{{ a.files_newest_day }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <footer>
+    Served from HDFS, not from the stream. Readings appear one sink batch late,
+    which is why every row carries its own age.
+  </footer>
+</main>
+</body>
+</html>
