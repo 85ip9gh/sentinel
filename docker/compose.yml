@@ -151,6 +151,10 @@ services:
       SENTINEL_HDFS_ROOT: /sentinel/raw
     ports:
       - "127.0.0.1:8088:8088"
+      # Reachable over the tailnet so the Cloudflare Tunnel on g7 can use this
+      # as an origin. Same ":?" guard as the broker: an empty value would bind
+      # 0.0.0.0 and put the page on the LAN as well.
+      - "${SENTINEL_TAILNET_IP:?set SENTINEL_TAILNET_IP in docker/.env}:8088:8088"
     depends_on:
       namenode:
         condition: service_healthy

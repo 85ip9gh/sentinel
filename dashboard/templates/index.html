@@ -29,6 +29,8 @@
            gap: 1rem; flex-wrap: wrap; border-bottom: 1px solid var(--line);
            padding-bottom: 0.75rem; }
   .sub { color: var(--muted); font-size: 0.8rem; font-variant-numeric: tabular-nums; }
+  .intro { margin: 1.1rem 0 0; max-width: 62ch; color: var(--muted); font-size: 0.9rem; }
+  .intro a { color: inherit; }
   .grid { display: grid; gap: 0.75rem; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); }
   .card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 1rem; }
   .card-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; }
@@ -63,6 +65,14 @@
     <h1>Sentinel</h1>
     <div class="sub">generated {{ generated_at }} &middot; refreshes every 30s</div>
   </header>
+
+  <p class="intro">
+    Live telemetry from my own infrastructure. Two machines publish a reading
+    every ten seconds into Kafka, Hadoop keeps every reading partitioned by day,
+    and this page reads the archive back. Single node, gigabytes rather than
+    terabytes, and honest about it. Built by
+    <a href="https://pesanth.com">Pesanth</a>.
+  </p>
 
   <h2>Hosts</h2>
   {% if hosts %}
@@ -148,8 +158,14 @@
   </div>
 
   <footer>
-    Served from HDFS, not from the stream. Readings appear one sink batch late,
-    which is why every row carries its own age.
+    Served from HDFS, not from the stream. A page served from the stream would
+    look the same whether or not anything had been stored, so this one reads the
+    archive instead. The cost is that readings appear one batch late, which is
+    why every row carries its own age.
+    <br><br>
+    Python, Kafka in KRaft mode, single-node HDFS, Cloudflare Tunnel. The
+    collectors buffer to disk when the broker is unreachable, so a gap in this
+    page is a gap in the page rather than a gap in the archive.
   </footer>
 </main>
 </body>
