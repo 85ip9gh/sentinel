@@ -67,11 +67,10 @@
   </header>
 
   <p class="intro">
-    Live telemetry from my own infrastructure. Two machines publish a reading
-    every ten seconds into Kafka, Hadoop keeps every reading partitioned by day,
-    and this page reads the archive back. Single node, gigabytes rather than
-    terabytes, and honest about it. Built by
-    <a href="https://pesanth.com">Pesanth</a>.
+    Live telemetry from a self-hosted environment. Two hosts publish readings
+    every ten seconds into Kafka, a sink writes them into HDFS partitioned by
+    day, and this page reads from that archive. Single-node deployment. Built by
+    <a href="https://pesanth.com">Pesanth Janaseth</a>.
   </p>
 
   <h2>Hosts</h2>
@@ -158,14 +157,12 @@
   </div>
 
   <footer>
-    Served from HDFS, not from the stream. A page served from the stream would
-    look the same whether or not anything had been stored, so this one reads the
-    archive instead. The cost is that readings appear one batch late, which is
-    why every row carries its own age.
+    This page reads from the HDFS archive rather than from the Kafka stream, so
+    readings appear one sink batch behind live and every row shows its own age.
     <br><br>
-    Python, Kafka in KRaft mode, single-node HDFS, Cloudflare Tunnel. The
-    collectors buffer to disk when the broker is unreachable, so a gap in this
-    page is a gap in the page rather than a gap in the archive.
+    Python, Kafka in KRaft mode, single-node HDFS, and Cloudflare Tunnel.
+    Collectors buffer readings to local disk when the broker is unreachable and
+    replay them in order once it returns.
   </footer>
 </main>
 </body>
