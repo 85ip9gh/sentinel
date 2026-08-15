@@ -112,6 +112,26 @@ class Publisher:
             log.warning("%d messages still queued after flush", remaining)
         return remaining == 0 and self._cycle_failures == 0
 
+    def close(self) -> None:
+        """Flush, then force every still-undelivered reading onto the spool.
+
+        `flush` returning a non-zero count means messages are still in flight,
+        and their delivery callbacks have not run. Exiting there would drop them
+        silently, which is the exact hole the spool exists to close. `purge`
+        fires those callbacks with an error, so the normal failure path writes
+        them to disk instead.
+        """
+        remaining = self._producer.flush(self._flush_timeout)
+        if not remaining:
+            return
+
+        purge = getattr(self._producer, "purge", None)
+        if purge is None:
+            log.error("%d readings dropped: producer cannot be purged", remaining)
+            return
+        purge(in_flight=True)
+        self._producer.flush(self._flush_timeout)
+
     @property
     def healthy(self) -> bool:
         return self._cycle_failures == 0

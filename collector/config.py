@@ -80,7 +80,10 @@ class Config:
     def from_env(cls, env: dict | None = None) -> "Config":
         env = dict(os.environ if env is None else env)
         return cls(
-            bootstrap=_env_str(env, "SENTINEL_BOOTSTRAP", "localhost:9092"),
+            # 127.0.0.1 rather than localhost: on Windows localhost resolves to
+            # ::1 first, and the broker publishes its host port on IPv4 only, so
+            # every connection pays a two second timeout before falling back.
+            bootstrap=_env_str(env, "SENTINEL_BOOTSTRAP", "127.0.0.1:9092"),
             host=_env_str(env, "SENTINEL_HOST", socket.gethostname().lower()),
             role=_env_str(env, "SENTINEL_ROLE", "unknown"),
             system_interval=_env_float(env, "SENTINEL_SYSTEM_INTERVAL", 10.0),

@@ -16,10 +16,22 @@ services:
       CLUSTER_ID: ${KAFKA_CLUSTER_ID:-sentinel-single-node-0001}
       KAFKA_NODE_ID: 1
       KAFKA_PROCESS_ROLES: broker,controller
-      KAFKA_LISTENERS: INTERNAL://0.0.0.0:9092,EXTERNAL://0.0.0.0:9094,CONTROLLER://0.0.0.0:9093
-      KAFKA_ADVERTISED_LISTENERS: INTERNAL://localhost:9092,EXTERNAL://${SENTINEL_TAILNET_IP}:9094
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT
-      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      # Bind every interface with the empty-host form, never "0.0.0.0". This
+      # image's setup step fails with "advertised.listeners cannot use the
+      # nonroutable meta-address 0.0.0.0" when the bind address is spelled out,
+      # even though advertised.listeners is set separately and contains no such
+      # address. The error names the wrong property, so it reads as a mistake in
+      # the advertised list rather than in the bind list.
+      #
+      # Three client listeners, because a client is told to reconnect to the
+      # advertised address and the three kinds of client sit in different
+      # networks. HOST is for processes on this machine reaching the published
+      # port, DOCKER is for containers on this compose network, and TAILNET is
+      # for collectors on other machines.
+      KAFKA_LISTENERS: HOST://:9092,TAILNET://:9094,DOCKER://:9095,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: HOST://localhost:9092,TAILNET://${SENTINEL_TAILNET_IP}:9094,DOCKER://kafka:9095
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: HOST:PLAINTEXT,TAILNET:PLAINTEXT,DOCKER:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: DOCKER
       KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
       KAFKA_CONTROLLER_QUORUM_VOTERS: 1@localhost:9093
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
@@ -53,12 +65,12 @@ services:
       - |
         set -euo pipefail
         for topic in sentinel.system sentinel.http sentinel.container; do
-          /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 \
+          /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9095 \
             --create --if-not-exists --topic "$$topic" \
             --partitions 3 --replication-factor 1 \
             --config retention.ms=604800000 --config compression.type=producer
         done
-        /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --list
+        /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9095 --list
 
 volumes:
   kafka-data:

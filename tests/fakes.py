@@ -18,9 +18,18 @@ class FakeProducer:
     the publisher has to get right.
     """
 
-    def __init__(self, deliver: bool = True, raise_buffer_error: bool = False) -> None:
+    def __init__(
+        self,
+        deliver: bool = True,
+        raise_buffer_error: bool = False,
+        stall: bool = False,
+    ) -> None:
         self.deliver = deliver
         self.raise_buffer_error = raise_buffer_error
+        # `stall` models the case that matters at shutdown: messages are still
+        # in flight, so flush returns a non-zero count and no callback has run.
+        self.stall = stall
+        self.purged = False
         self.produced: list[tuple[str, bytes, bytes]] = []
         self._pending: list = []
 
@@ -34,10 +43,18 @@ class FakeProducer:
         return 0
 
     def flush(self, timeout):
+        if self.stall:
+            return len(self._pending)
         pending, self._pending = self._pending, []
         for callback in pending:
             callback(None if self.deliver else FakeError(), None)
         return 0
+
+    def purge(self, in_flight=True):
+        """Mirrors librdkafka: pending callbacks fire with an error."""
+        self.purged = True
+        self.stall = False
+        self.deliver = False
 
 
 class FakePublisher:

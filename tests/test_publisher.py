@@ -68,6 +68,33 @@ def test_the_spool_replays_once_the_broker_is_back(tmp_path):
     ]
 
 
+def test_shutdown_spools_readings_that_are_still_in_flight(tmp_path):
+    """Exiting with messages queued must not drop them."""
+    publisher, spool, producer = _publisher(tmp_path, stall=True)
+
+    publisher.begin_cycle()
+    publisher.send(TOPIC, b"cubebox", '{"n":1}')
+    assert publisher.flush() is False
+    assert spool.pending(TOPIC) == 0
+
+    publisher.close()
+
+    assert producer.purged is True
+    assert spool.pending(TOPIC) == 1
+
+
+def test_shutdown_is_quiet_when_everything_was_delivered(tmp_path):
+    publisher, spool, producer = _publisher(tmp_path)
+
+    publisher.begin_cycle()
+    publisher.send(TOPIC, b"cubebox", '{"n":1}')
+    publisher.flush()
+    publisher.close()
+
+    assert producer.purged is False
+    assert spool.pending(TOPIC) == 0
+
+
 def test_a_replay_that_fails_again_stays_on_disk(tmp_path):
     """The claim-then-replay path must not delete readings it could not deliver."""
     publisher, spool, producer = _publisher(tmp_path, deliver=False)
