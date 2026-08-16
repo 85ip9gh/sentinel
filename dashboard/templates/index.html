@@ -72,6 +72,16 @@
     day, and this page reads from that archive. Single-node deployment. Built by
     <a href="https://pesanth.com">Pesanth Janaseth</a>.
   </p>
+  {% if public %}
+  <p class="intro">
+    Hosts appear under stable aliases, and machine-identifying detail (mount
+    points, capacities, process counts, exact uptime) is withheld from this
+    view. Monitoring a small number of personally owned machines in public is a
+    privacy question before it is an engineering one, so the projection is
+    applied once, to the document both this page and
+    <code>/api/status</code> are rendered from.
+  </p>
+  {% endif %}
 
   <h2>Hosts</h2>
   {% if hosts %}
@@ -90,10 +100,10 @@
       <dl>
         <dt>CPU</dt><dd>{{ h.cpu_percent }}%{% if h.load_avg %} &middot; load {{ h.load_avg[0] }}{% endif %}</dd>
         <dt>Memory</dt><dd>{{ h.memory_percent }}%{% if h.memory_available_gb %} &middot; {{ h.memory_available_gb }} GB free{% endif %}</dd>
-        {% if h.disk_worst %}<dt>Disk {{ h.disk_worst.mount }}</dt><dd>{{ h.disk_worst.percent }}%</dd>{% endif %}
+        {% if h.disk_worst %}<dt>Disk{% if h.disk_worst.mount %} {{ h.disk_worst.mount }}{% endif %}</dt><dd>{{ h.disk_worst.percent }}%</dd>{% endif %}
         {% if h.temperature_max %}<dt>Peak temp</dt><dd>{{ h.temperature_max }} &deg;C</dd>{% endif %}
-        <dt>Uptime</dt><dd>{{ h.uptime_days }} d</dd>
-        <dt>Processes</dt><dd>{{ h.process_count }}</dd>
+        <dt>Uptime</dt><dd>{{ h.uptime_label }}</dd>
+        {% if h.process_count %}<dt>Processes</dt><dd>{{ h.process_count }}</dd>{% endif %}
       </dl>
     </section>
     {% endfor %}

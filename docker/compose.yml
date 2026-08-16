@@ -149,6 +149,14 @@ services:
     environment:
       SENTINEL_HDFS_URL: http://namenode:9870
       SENTINEL_HDFS_ROOT: /sentinel/raw
+      # This page is served to the open internet through the tunnel, so the
+      # redacting view is the default and turning it off is the explicit act.
+      # The aliases and the salt live in docker/.env because putting the real
+      # hostnames in a tracked file would undo the point of aliasing them.
+      SENTINEL_PUBLIC: ${SENTINEL_PUBLIC:-1}
+      SENTINEL_HOST_ALIASES: ${SENTINEL_HOST_ALIASES:-}
+      SENTINEL_ALIAS_SALT: ${SENTINEL_ALIAS_SALT:-}
+      SENTINEL_PUBLIC_LAG_SECONDS: ${SENTINEL_PUBLIC_LAG_SECONDS:-0}
     ports:
       - "127.0.0.1:8088:8088"
       # Reachable over the tailnet so the Cloudflare Tunnel on g7 can use this

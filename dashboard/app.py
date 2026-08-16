@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from flask import Flask, jsonify, render_template
+from flask import Flask, Response, jsonify, render_template
 
+from .redact import PublicView
 from .store import Archive, age_seconds
 
 # A reading older than this is stale enough to mean something is wrong, given
@@ -34,6 +35,7 @@ def host_view(record: dict[str, Any], now: datetime) -> dict[str, Any]:
     disks = data.get("disks") or []
     temps = data.get("temperatures") or []
     age = age_seconds(record, now)
+    uptime_days = round(data.get("uptime_seconds", 0) / 86400, 2)
 
     return {
         "host": record.get("host"),
@@ -47,7 +49,10 @@ def host_view(record: dict[str, Any], now: datetime) -> dict[str, Any]:
         "memory_available_gb": _gb(data.get("memory", {}).get("available_bytes")),
         "disk_worst": max(disks, key=lambda d: d.get("percent", 0)) if disks else None,
         "temperature_max": max((t.get("celsius", 0) for t in temps), default=None),
-        "uptime_days": round(data.get("uptime_seconds", 0) / 86400, 2),
+        "uptime_days": uptime_days,
+        # The template renders the label, so the public view can coarsen the
+        # figure without the page having to know which mode it is in.
+        "uptime_label": f"{uptime_days} d",
         "process_count": data.get("process_count"),
     }
 
@@ -55,7 +60,7 @@ def host_view(record: dict[str, Any], now: datetime) -> dict[str, Any]:
 def build_status(archive: Archive, now: datetime | None = None) -> dict[str, Any]:
     now = now or datetime.now(timezone.utc)
 
-    system = archive.latest_by_host("system")
+    system = archive.latest_by_host("system", not_after=now)
     hosts = sorted(
         (host_view(record, now) for record in system.values()),
         key=lambda h: (h["host"] or ""),
@@ -64,7 +69,7 @@ def build_status(archive: Archive, now: datetime | None = None) -> dict[str, Any
     # One reading covers one URL, so the newest reading per host is not enough.
     # The day's records get folded down to the newest per host and URL.
     checks = []
-    http_records = archive.records("http", now.date().isoformat())
+    http_records = archive.records("http", now.date().isoformat(), not_after=now)
     newest_by_url: dict[tuple[str, str], dict[str, Any]] = {}
     for record in http_records:
         data = record.get("data", {})
@@ -92,7 +97,9 @@ def build_status(archive: Archive, now: datetime | None = None) -> dict[str, Any
     # has not been seen recently. A container that is removed simply stops being
     # reported, and nothing emits a tombstone for it.
     newest_by_container: dict[tuple[str, str], dict[str, Any]] = {}
-    for record in archive.records("container", now.date().isoformat(), newest_files=6):
+    for record in archive.records(
+        "container", now.date().isoformat(), newest_files=6, not_after=now
+    ):
         data = record.get("data", {})
         if not isinstance(data, dict):
             continue
@@ -124,8 +131,40 @@ def build_status(archive: Archive, now: datetime | None = None) -> dict[str, Any
     }
 
 
-def create_app(archive: Archive) -> Flask:
+def create_app(archive: Archive, view: PublicView | None = None) -> Flask:
+    # No view supplied means the defaults, and the defaults redact. A dashboard
+    # constructed by a caller that has not thought about it must not be the one
+    # that publishes hostnames.
+    view = view or PublicView()
     app = Flask(__name__)
+
+    def status() -> dict[str, Any]:
+        """The single place a status document is produced for a request.
+
+        Both the page and the API go through here, so the projection cannot be
+        applied to one and forgotten on the other.
+        """
+        now = datetime.now(timezone.utc) - timedelta(seconds=view.lag_seconds)
+        return view.apply(build_status(archive, now))
+
+    @app.after_request
+    def _headers(response: Response) -> Response:
+        # Telemetry that a crawler has cached is telemetry that outlives the
+        # reading, and a search result for this host is not something anyone
+        # asked for: the portfolio links here directly.
+        response.headers["X-Robots-Tag"] = "noindex, nofollow"
+        response.headers["Cache-Control"] = "no-store"
+        response.headers["Referrer-Policy"] = "no-referrer"
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; "
+            "form-action 'none'; frame-ancestors 'none'"
+        )
+        return response
+
+    @app.get("/robots.txt")
+    def robots():
+        return Response("User-agent: *\nDisallow: /\n", mimetype="text/plain")
 
     @app.get("/healthz")
     def healthz():
@@ -133,10 +172,10 @@ def create_app(archive: Archive) -> Flask:
 
     @app.get("/api/status")
     def api_status():
-        return jsonify(build_status(archive))
+        return jsonify(status())
 
     @app.get("/")
     def index():
-        return render_template("index.html", **build_status(archive))
+        return render_template("index.html", **status())
 
     return app
