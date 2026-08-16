@@ -30,6 +30,8 @@
            padding-bottom: 0.75rem; }
   .sub { color: var(--muted); font-size: 0.8rem; font-variant-numeric: tabular-nums; }
   .intro { margin: 1.1rem 0 0; max-width: 62ch; color: var(--muted); font-size: 0.9rem; }
+  .notice { margin: 1.1rem 0 0; max-width: 62ch; font-size: 0.9rem; color: var(--late);
+            border-left: 2px solid var(--late); padding-left: 0.75rem; }
   .intro a { color: inherit; }
   .grid { display: grid; gap: 0.75rem; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); }
   .card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 1rem; }
@@ -80,6 +82,16 @@
     privacy question before it is an engineering one, so the projection is
     applied once, to the document both this page and
     <code>/api/status</code> are rendered from.
+  </p>
+  {% endif %}
+
+  {% if upstream and upstream.stale %}
+  <p class="notice">
+    The archive host is not answering, so this is the last document it produced
+    {% if upstream.age_seconds %}({{ upstream.age_seconds }}s ago){% endif %}.
+    Card ages keep counting, so nothing below is being presented as current.
+    This page runs on a separate always-on host and reads the archive across a
+    private network, which is why it is still here to say so.
   </p>
   {% endif %}
 

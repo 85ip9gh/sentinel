@@ -1,0 +1,30 @@
+[Unit]
+Description=Sentinel public dashboard mirror
+Documentation=https://github.com/85ip9gh/sentinel
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=sentinel
+Group=sentinel
+WorkingDirectory=/opt/sentinel
+EnvironmentFile=/etc/sentinel/mirror.env
+ExecStart=/opt/sentinel/.venv/bin/python -m dashboard.mirror
+Restart=always
+RestartSec=10
+
+# The mirror makes one outbound HTTP request on a timer and writes one cache
+# file. It holds no archive, and it is the process facing the internet through
+# the tunnel, so it gets the same treatment as the collector.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+ReadWritePaths=/var/lib/sentinel
+
+[Install]
+WantedBy=multi-user.target
