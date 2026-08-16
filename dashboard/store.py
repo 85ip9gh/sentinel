@@ -44,8 +44,20 @@ class Archive:
     def files(self, kind: str, date: str) -> list[str]:
         return self._writer.listing(partition_dir(self._root, kind, date))
 
-    def records(self, kind: str, date: str, newest_files: int = 3) -> list[dict[str, Any]]:
-        """Parse the most recent partition files for one day."""
+    def records(
+        self,
+        kind: str,
+        date: str,
+        newest_files: int = 3,
+        not_after: datetime | None = None,
+    ) -> list[dict[str, Any]]:
+        """Parse the most recent partition files for one day.
+
+        `not_after` hides readings stamped later than a given moment. It is what
+        makes a deliberately delayed public view a delayed view rather than a
+        live one with confusing ages, and it also drops readings from a host
+        whose clock has run ahead.
+        """
         directory = partition_dir(self._root, kind, date)
         out: list[dict[str, Any]] = []
         for name in sorted(self.files(kind, date))[-newest_files:]:
@@ -58,23 +70,33 @@ class Archive:
                 if not line:
                     continue
                 try:
-                    out.append(json.loads(line))
+                    record = json.loads(line)
                 except json.JSONDecodeError:
                     continue
+                if not_after is not None:
+                    ts = _parse_ts(record.get("ts", "") if isinstance(record, dict) else "")
+                    # An unreadable timestamp is kept: the partition writer files
+                    # those under dt=unknown rather than dropping them, and this
+                    # is a display filter, not a validity check.
+                    if ts is not None and ts > not_after:
+                        continue
+                out.append(record)
         return out
 
-    def latest_by_host(self, kind: str, days_back: int = 2) -> dict[str, dict[str, Any]]:
+    def latest_by_host(
+        self, kind: str, days_back: int = 2, not_after: datetime | None = None
+    ) -> dict[str, dict[str, Any]]:
         """The newest reading of a kind per host.
 
         Looks back more than one day on purpose. Just after midnight UTC the
         current partition can be empty while yesterday's holds everything.
         """
-        today = datetime.now(timezone.utc).date()
+        today = (not_after or datetime.now(timezone.utc)).date()
         latest: dict[str, dict[str, Any]] = {}
 
         for offset in range(days_back):
             date = (today - timedelta(days=offset)).isoformat()
-            for record in self.records(kind, date):
+            for record in self.records(kind, date, not_after=not_after):
                 host = record.get("host")
                 ts = _parse_ts(record.get("ts", ""))
                 if not host or ts is None:
