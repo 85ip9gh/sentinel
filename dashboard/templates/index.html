@@ -6,38 +6,51 @@
 <meta http-equiv="refresh" content="30">
 <title>Sentinel</title>
 <style>
+  /* Palette, type and spacing match pesanth.com so the site reads as one system. */
   :root {
-    --bg: #fbfbf9; --panel: #ffffff; --ink: #1a1a1a; --muted: #6b6b6b;
-    --line: #e4e4e0; --ok: #1f7a4d; --late: #96690d; --bad: #a3281f;
+    --background: #f7f7f5; --surface: #ffffff; --foreground: #171717;
+    --muted: #525252; --subtle: #6f6f6f; --accent: #292929; --line: #d8d8d4;
+    --ok: #1f7a4d; --late: #8a6410; --bad: #a3281f;
+    --sans: "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    --mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    --radius: 0.6rem;
   }
   @media (prefers-color-scheme: dark) {
     :root {
-      --bg: #121212; --panel: #1a1a1a; --ink: #ededed; --muted: #9a9a9a;
-      --line: #2c2c2c; --ok: #4fbf85; --late: #d4a029; --bad: #e2685c;
+      --background: #101111; --surface: #181919; --foreground: #f1f1ee;
+      --muted: #bebebb; --subtle: #999995; --accent: #e6e6e2; --line: #373838;
+      --ok: #4fbf85; --late: #d4a029; --bad: #e2685c;
+      color-scheme: dark;
     }
   }
   * { box-sizing: border-box; }
   body {
-    margin: 0; padding: 2rem 1.25rem; background: var(--bg); color: var(--ink);
-    font: 15px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    margin: 0; padding-block: clamp(2rem, 5vw, 3.25rem); background: var(--background);
+    color: var(--foreground); font: 0.95rem/1.6 var(--sans); text-rendering: optimizeLegibility;
   }
-  main { max-width: 1080px; margin: 0 auto; }
-  h1 { font-size: 1.35rem; margin: 0; letter-spacing: -0.01em; }
-  h2 { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.08em;
-       color: var(--muted); margin: 2.25rem 0 0.75rem; font-weight: 600; }
+  main { width: min(calc(100% - 2.5rem), 1080px); margin-inline: auto; }
+  a { color: inherit; }
+  a:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; border-radius: 0.2rem; }
+  h1 { margin: 0; font-size: 1.5rem; font-weight: 650; letter-spacing: -0.04em; }
+  h2 { margin: 2.5rem 0 0.9rem; color: var(--accent); font: 600 0.68rem var(--mono);
+       letter-spacing: 0.12em; text-transform: uppercase; }
   header { display: flex; justify-content: space-between; align-items: baseline;
            gap: 1rem; flex-wrap: wrap; border-bottom: 1px solid var(--line);
-           padding-bottom: 0.75rem; }
-  .sub { color: var(--muted); font-size: 0.8rem; font-variant-numeric: tabular-nums; }
-  .intro { margin: 1.1rem 0 0; max-width: 62ch; color: var(--muted); font-size: 0.9rem; }
-  .notice { margin: 1.1rem 0 0; max-width: 62ch; font-size: 0.9rem; color: var(--late);
-            border-left: 2px solid var(--late); padding-left: 0.75rem; }
-  .intro a { color: inherit; }
+           padding-bottom: 0.9rem; }
+  .sub { color: var(--subtle); font: 0.62rem/1.5 var(--mono); font-variant-numeric: tabular-nums; }
+  .intro { margin: 1.15rem 0 0; max-width: 62ch; color: var(--muted); font-size: 0.88rem; }
+  .intro a { text-decoration: underline; text-underline-offset: 0.2em;
+             text-decoration-color: var(--line); transition: color 180ms ease; }
+  .intro a:hover { color: var(--accent); }
+  .notice { margin: 1.15rem 0 0; max-width: 62ch; padding-left: 0.85rem; border-left: 2px solid var(--late);
+            color: var(--late); font-size: 0.88rem; }
   .grid { display: grid; gap: 0.75rem; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); }
-  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 1rem; }
-  .card-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; }
-  .name { font-weight: 600; }
-  .role { color: var(--muted); font-size: 0.78rem; }
+  .card { padding: 1rem; border: 1px solid var(--line); border-radius: var(--radius);
+          background: var(--surface); box-shadow: 0 0.4rem 1.2rem rgba(17, 17, 19, 0.04); }
+  .card-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.8rem; }
+  .name { font-weight: 650; letter-spacing: -0.01em; }
+  .role { margin-top: 0.15rem; color: var(--subtle); font: 0.62rem var(--mono);
+          letter-spacing: 0.08em; text-transform: uppercase; }
   .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 0.4rem; }
   .fresh .dot, .fresh { color: var(--ok); }
   .late .dot, .late { color: var(--late); }
@@ -45,20 +58,23 @@
   .fresh .dot { background: var(--ok); }
   .late .dot { background: var(--late); }
   .stale .dot, .unknown .dot { background: var(--bad); }
-  .badge { font-size: 0.75rem; font-variant-numeric: tabular-nums; }
-  dl { display: grid; grid-template-columns: auto 1fr; gap: 0.3rem 1rem; margin: 0; font-size: 0.85rem; }
+  .badge { font: 0.68rem var(--mono); font-variant-numeric: tabular-nums; }
+  dl { display: grid; grid-template-columns: auto 1fr; gap: 0.35rem 1rem; margin: 0; font-size: 0.82rem; }
   dt { color: var(--muted); }
   dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; }
   .table-wrap { overflow-x: auto; }
-  table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
-  th { text-align: left; font-weight: 600; color: var(--muted); font-size: 0.75rem;
-       text-transform: uppercase; letter-spacing: 0.05em; padding: 0.5rem 0.75rem 0.5rem 0; }
-  td { padding: 0.5rem 0.75rem 0.5rem 0; border-top: 1px solid var(--line);
+  table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+  th { padding: 0.5rem 0.75rem 0.5rem 0; border-bottom: 1px solid var(--line); color: var(--subtle);
+       font: 0.62rem var(--mono); letter-spacing: 0.08em; text-align: left; text-transform: uppercase; }
+  td { padding: 0.55rem 0.75rem 0.55rem 0; border-top: 1px solid var(--line);
        font-variant-numeric: tabular-nums; }
   td.url { font-variant-numeric: normal; word-break: break-all; }
-  .empty { color: var(--muted); font-size: 0.85rem; padding: 1rem 0; }
-  footer { margin-top: 2.5rem; padding-top: 1rem; border-top: 1px solid var(--line);
-           color: var(--muted); font-size: 0.78rem; }
+  .empty { padding: 1rem 0; color: var(--muted); font-size: 0.82rem; }
+  footer { margin-top: 2.75rem; padding-top: 1.1rem; border-top: 1px solid var(--line);
+           color: var(--subtle); font-size: 0.72rem; }
+  footer a { text-decoration: underline; text-underline-offset: 0.2em;
+             text-decoration-color: var(--line); transition: color 180ms ease; }
+  footer a:hover { color: var(--accent); }
 </style>
 </head>
 <body>
@@ -185,6 +201,9 @@
     Python, Kafka in KRaft mode, single-node HDFS, and Cloudflare Tunnel.
     Collectors buffer readings to local disk when the broker is unreachable and
     replay them in order once it returns.
+    <br><br>
+    Built by <a href="https://pesanth.com">Pesanth Janaseth</a> &middot;
+    <a href="https://pesanth.com/work/sentinel">Technical overview</a>
   </footer>
 </main>
 </body>
