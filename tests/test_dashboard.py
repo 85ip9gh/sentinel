@@ -2,6 +2,7 @@ import json
 from datetime import datetime, timezone
 
 from dashboard.app import build_status, create_app
+from dashboard.redact import PublicView
 from dashboard.store import Archive
 
 from .fakes import FakeWriter
@@ -181,7 +182,7 @@ def test_an_empty_archive_renders_rather_than_raising():
 def test_the_page_and_the_api_both_serve():
     writer = FakeWriter()
     _write(writer, "system", "2026-08-15", [_system("host-b", "2026-08-15T17:04:30Z")])
-    client = create_app(_archive(writer)).test_client()
+    client = create_app(_archive(writer), PublicView(enabled=False)).test_client()
 
     page = client.get("/")
     assert page.status_code == 200
@@ -192,3 +193,21 @@ def test_the_page_and_the_api_both_serve():
     assert api.get_json()["hosts"][0]["host"] == "host-b"
 
     assert client.get("/healthz").get_json() == {"ok": True}
+
+
+def test_a_reading_stamped_in_the_future_is_not_shown():
+    """A host whose clock has run ahead would otherwise win every comparison."""
+    writer = FakeWriter()
+    _write(
+        writer,
+        "system",
+        "2026-08-15",
+        [
+            _system("host-b", "2026-08-15T17:04:30Z", cpu=3.0),
+            _system("host-b", "2026-08-15T23:00:00Z", cpu=99.0),
+        ],
+    )
+
+    host = build_status(_archive(writer), NOW)["hosts"][0]
+
+    assert host["cpu_percent"] == 3.0

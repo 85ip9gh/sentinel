@@ -66,6 +66,67 @@ would look identical whether or not anything had been stored, so it would prove
 nothing. The cost is that readings appear one sink batch late, which is why
 every row carries its own age.
 
+### What the public view withholds
+
+The dashboard is published under a personal domain, and telemetry from a
+handful of personally owned machines is not neutral data. A hostname, a drive
+letter, a RAM figure and a process count are a description of one named
+person's equipment, and the same fields sampled every ten seconds are a
+description of when that person is at their desk.
+
+So the outside gets a projection. Hosts appear under stable aliases, mount
+points, capacities, filesystem types, free memory and process counts are
+dropped, and uptime is bucketed rather than exact, because an exact uptime
+dates a reboot and a reboot dates a person. Percentages, temperatures,
+latencies and freshness survive, which is everything the page was for.
+
+Three properties matter more than the field list:
+
+* The projection is applied once, to the whole status document, so the HTML
+  page and `/api/status` cannot disagree about what is public.
+* It is on unless `SENTINEL_PUBLIC=0`, so a forgotten variable fails towards
+  saying less. A dashboard built without a view argument redacts.
+* Aliases are stable, because a name that changed on every restart would
+  destroy the one thing this page is for.
+
+What redaction does not fix is timing. A card that goes quiet still says the
+machine behind it is off, whatever the machine is called, and that is a
+presence signal about a home rather than a fact about a computer.
+`SENTINEL_PUBLIC_LAG_SECONDS=86400` answers it by serving yesterday's view, and
+costs the page its liveness, so it is off by default and is a deliberate call.
+
+### The mirror
+
+The archive lives on a workstation that gets switched off, and while that
+machine also served the page, the whole site went dark with it. A domain that
+stops answering is a broader statement than any field on the page: it says the
+one host is down, and by extension something about the building it is in.
+
+So the public page is served by `python -m dashboard.mirror` on the always-on
+server, which polls the workstation's already redacted `/api/status` across the
+tailnet, caches the last good document to disk, and serves that. The tunnel
+points at it over loopback.
+
+It keeps no archive of its own. Holding readings here would mean a second copy
+of the same telemetry on a second machine, which is more exposure rather than
+less, and the redaction would then have two places to go wrong instead of one.
+
+Ages are rebased on the way out. A cached document carries the ages that were
+true when it was fetched, and serving those unchanged would show a host that
+has been off for an hour as fresh, which is the one lie a monitoring page must
+not tell. Every age has the elapsed time added and its freshness recomputed, so
+during an outage the cards visibly age out under a notice saying the archive
+host is not answering. The site stays up, and one quiet card is a much weaker
+signal than a dead domain.
+
+A failed fetch publishes the exception's class name and nothing else. A
+`requests` error quotes the URL it failed on, and that URL is the archive
+host's tailnet address.
+
+Raw values are still one variable away, and the honest way to have both is a
+second dashboard bound to loopback with `SENTINEL_PUBLIC=0`, rather than
+turning redaction off on the instance the tunnel points at.
+
 ### The spool is the point
 
 The broker runs on a workstation that is not on all the time. A collector that
@@ -147,6 +208,22 @@ Sink and dashboard:
 | `SENTINEL_SINK_BATCH_RECORDS` | `500` | Close a batch at this many readings |
 | `SENTINEL_SINK_BATCH_SECONDS` | `60` | Close a batch at this age, so a quiet topic still lands |
 | `SENTINEL_DASHBOARD_PORT` | `8088` | Dashboard listen port |
+| `SENTINEL_PUBLIC` | `1` | Redact the dashboard. `0` serves real hostnames and full detail |
+| `SENTINEL_HOST_ALIASES` | empty | `real=public,other=public2`. Unlisted hosts become `host-<digest>` |
+| `SENTINEL_ALIAS_SALT` | empty | Makes the digest unguessable. Changing it renames every host |
+| `SENTINEL_PUBLIC_LAG_SECONDS` | `0` | Hold readings back this long. `86400` removes the live presence signal |
+
+Mirror, which runs on the always-on host and serves the public page:
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `SENTINEL_MIRROR_UPSTREAM` | `http://127.0.0.1:8088/api/status` | The redacted document to follow |
+| `SENTINEL_MIRROR_INTERVAL` | `20` | Seconds between polls |
+| `SENTINEL_MIRROR_TIMEOUT` | `5` | Per-poll timeout. Bounds how long an outage takes to notice |
+| `SENTINEL_MIRROR_CACHE` | `var/mirror-status.json` | Last good document, so a restart mid-outage still serves |
+| `SENTINEL_MIRROR_STALE_SECONDS` | `300` | Older than this and the page says the archive host is unreachable |
+| `SENTINEL_MIRROR_HOST` | `127.0.0.1` | Listen address. The tunnel is on the same host, so loopback |
+| `SENTINEL_MIRROR_PORT` | `8088` | Listen port |
 
 ## Deploying a collector
 
@@ -169,6 +246,23 @@ powershell -ExecutionPolicy Bypass -File deploy\windows\install-task.ps1
 Registered for the current user and started at logon, so no elevation is
 needed. Docker Desktop also starts at logon and takes longer, which the spool
 covers.
+
+## Deploying the public mirror
+
+On the always-on host, the one the tunnel runs on:
+
+```
+sudo deploy/g7/install-mirror.sh --upstream http://100.x.x.x:8088/api/status
+```
+
+Shares the `/opt/sentinel` virtualenv and the `sentinel` user with the
+collector, listens on loopback, and caches to `/var/lib/sentinel`. Point the
+tunnel's ingress rule for the public hostname at `http://localhost:8088`, and
+validate before restarting:
+
+```
+cloudflared tunnel ingress validate
+```
 
 ## Tests
 

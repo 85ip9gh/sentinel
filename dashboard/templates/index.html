@@ -30,6 +30,8 @@
            padding-bottom: 0.75rem; }
   .sub { color: var(--muted); font-size: 0.8rem; font-variant-numeric: tabular-nums; }
   .intro { margin: 1.1rem 0 0; max-width: 62ch; color: var(--muted); font-size: 0.9rem; }
+  .notice { margin: 1.1rem 0 0; max-width: 62ch; font-size: 0.9rem; color: var(--late);
+            border-left: 2px solid var(--late); padding-left: 0.75rem; }
   .intro a { color: inherit; }
   .grid { display: grid; gap: 0.75rem; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); }
   .card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 1rem; }
@@ -72,6 +74,26 @@
     day, and this page reads from that archive. Single-node deployment. Built by
     <a href="https://pesanth.com">Pesanth Janaseth</a>.
   </p>
+  {% if public %}
+  <p class="intro">
+    Hosts appear under stable aliases, and machine-identifying detail (mount
+    points, capacities, process counts, exact uptime) is withheld from this
+    view. Monitoring a small number of personally owned machines in public is a
+    privacy question before it is an engineering one, so the projection is
+    applied once, to the document both this page and
+    <code>/api/status</code> are rendered from.
+  </p>
+  {% endif %}
+
+  {% if upstream and upstream.stale %}
+  <p class="notice">
+    The archive host is not answering, so this is the last document it produced
+    {% if upstream.age_seconds %}({{ upstream.age_seconds }}s ago){% endif %}.
+    Card ages keep counting, so nothing below is being presented as current.
+    This page runs on a separate always-on host and reads the archive across a
+    private network, which is why it is still here to say so.
+  </p>
+  {% endif %}
 
   <h2>Hosts</h2>
   {% if hosts %}
@@ -90,10 +112,10 @@
       <dl>
         <dt>CPU</dt><dd>{{ h.cpu_percent }}%{% if h.load_avg %} &middot; load {{ h.load_avg[0] }}{% endif %}</dd>
         <dt>Memory</dt><dd>{{ h.memory_percent }}%{% if h.memory_available_gb %} &middot; {{ h.memory_available_gb }} GB free{% endif %}</dd>
-        {% if h.disk_worst %}<dt>Disk {{ h.disk_worst.mount }}</dt><dd>{{ h.disk_worst.percent }}%</dd>{% endif %}
+        {% if h.disk_worst %}<dt>Disk{% if h.disk_worst.mount %} {{ h.disk_worst.mount }}{% endif %}</dt><dd>{{ h.disk_worst.percent }}%</dd>{% endif %}
         {% if h.temperature_max %}<dt>Peak temp</dt><dd>{{ h.temperature_max }} &deg;C</dd>{% endif %}
-        <dt>Uptime</dt><dd>{{ h.uptime_days }} d</dd>
-        <dt>Processes</dt><dd>{{ h.process_count }}</dd>
+        <dt>Uptime</dt><dd>{{ h.uptime_label }}</dd>
+        {% if h.process_count %}<dt>Processes</dt><dd>{{ h.process_count }}</dd>{% endif %}
       </dl>
     </section>
     {% endfor %}
