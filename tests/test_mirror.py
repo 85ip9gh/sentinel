@@ -144,8 +144,8 @@ def test_the_mirror_serves_the_page_the_api_and_the_same_headers(tmp_path):
     assert page.status_code == 200
     assert b"workstation-01" in page.data
     assert api.get_json()["hosts"][0]["host"] == "workstation-01"
-    assert page.headers["X-Robots-Tag"] == "noindex, nofollow"
-    assert client.get("/robots.txt").status_code == 200
+    assert "X-Robots-Tag" not in page.headers
+    assert client.get("/robots.txt").data == b"User-agent: *\nAllow: /\n"
 
 
 def test_the_page_says_when_the_archive_host_is_unreachable(tmp_path):
