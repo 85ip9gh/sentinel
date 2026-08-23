@@ -149,10 +149,9 @@ def create_app(archive: Archive, view: PublicView | None = None) -> Flask:
 
     @app.after_request
     def _headers(response: Response) -> Response:
-        # Telemetry that a crawler has cached is telemetry that outlives the
-        # reading, and a search result for this host is not something anyone
-        # asked for: the portfolio links here directly.
-        response.headers["X-Robots-Tag"] = "noindex, nofollow"
+        # Indexable since 2026-08-23, reversing the earlier noindex. The rest
+        # of the set stays: no-store keeps a cached copy of telemetry from
+        # outliving the reading it came from, which being listed does not.
         response.headers["Cache-Control"] = "no-store"
         response.headers["Referrer-Policy"] = "no-referrer"
         response.headers["X-Content-Type-Options"] = "nosniff"
@@ -164,7 +163,7 @@ def create_app(archive: Archive, view: PublicView | None = None) -> Flask:
 
     @app.get("/robots.txt")
     def robots():
-        return Response("User-agent: *\nDisallow: /\n", mimetype="text/plain")
+        return Response("User-agent: *\nAllow: /\n", mimetype="text/plain")
 
     @app.get("/healthz")
     def healthz():
