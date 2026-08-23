@@ -203,7 +203,8 @@ def create_mirror_app(upstream: Upstream) -> Flask:
 
     @app.after_request
     def _headers(response: Response) -> Response:
-        response.headers["X-Robots-Tag"] = "noindex, nofollow"
+        # Indexable since 2026-08-23. This app serves the public hostname, so
+        # the header set here is the one search engines actually see.
         response.headers["Cache-Control"] = "no-store"
         response.headers["Referrer-Policy"] = "no-referrer"
         response.headers["X-Content-Type-Options"] = "nosniff"
@@ -215,7 +216,7 @@ def create_mirror_app(upstream: Upstream) -> Flask:
 
     @app.get("/robots.txt")
     def robots():
-        return Response("User-agent: *\nDisallow: /\n", mimetype="text/plain")
+        return Response("User-agent: *\nAllow: /\n", mimetype="text/plain")
 
     @app.get("/healthz")
     def healthz():

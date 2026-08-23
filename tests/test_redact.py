@@ -161,11 +161,11 @@ def test_both_the_page_and_the_api_are_redacted_by_default():
     assert api.get_json()["public"] is True
 
 
-def test_the_public_page_is_not_indexable_or_cacheable():
+def test_the_public_page_is_indexable_but_not_cacheable():
     client = create_app(Archive(FakeWriter(), ROOT)).test_client()
 
     page = client.get("/")
 
-    assert page.headers["X-Robots-Tag"] == "noindex, nofollow"
+    assert "X-Robots-Tag" not in page.headers
     assert page.headers["Cache-Control"] == "no-store"
-    assert client.get("/robots.txt").data == b"User-agent: *\nDisallow: /\n"
+    assert client.get("/robots.txt").data == b"User-agent: *\nAllow: /\n"
