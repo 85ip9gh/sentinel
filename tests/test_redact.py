@@ -43,19 +43,19 @@ def _status(writer, view=None):
 
 def _one_host(**kwargs):
     writer = FakeWriter()
-    _write(writer, "system", "2026-08-15", [_system("cubebox", "2026-08-15T17:04:50Z")])
+    _write(writer, "system", "2026-08-15", [_system("host-a", "2026-08-15T17:04:50Z")])
     return _status(writer, **kwargs)["hosts"][0]
 
 
 def test_the_real_hostname_never_reaches_the_public_document():
     host = _one_host()
 
-    assert host["host"] != "cubebox"
+    assert host["host"] != "host-a"
     assert host["host"].startswith("host-")
 
 
 def test_a_configured_alias_is_used_instead_of_the_digest():
-    view = PublicView(aliases={"cubebox": "workstation-01"})
+    view = PublicView(aliases={"host-a": "workstation-01"})
 
     assert _one_host(view=view)["host"] == "workstation-01"
 
@@ -67,11 +67,11 @@ def test_an_alias_is_stable_across_calls_so_a_host_can_be_followed():
 def test_two_hosts_do_not_collapse_into_one_alias():
     view = PublicView()
 
-    assert view.alias("cubebox") != view.alias("g7-server")
+    assert view.alias("host-a") != view.alias("host-b")
 
 
 def test_the_salt_changes_the_digest_so_a_guessed_hostname_proves_nothing():
-    assert PublicView(salt="a").alias("cubebox") != PublicView(salt="b").alias("cubebox")
+    assert PublicView(salt="a").alias("host-a") != PublicView(salt="b").alias("host-a")
 
 
 def test_machine_identifying_detail_is_withheld():
@@ -94,12 +94,12 @@ def test_uptime_is_bucketed_rather_than_exact():
 
 def test_checks_and_containers_are_aliased_with_the_same_name_as_the_card():
     writer = FakeWriter()
-    _write(writer, "system", "2026-08-15", [_system("cubebox", "2026-08-15T17:04:50Z")])
+    _write(writer, "system", "2026-08-15", [_system("host-a", "2026-08-15T17:04:50Z")])
     _write(
         writer,
         "http",
         "2026-08-15",
-        [{"host": "cubebox", "kind": "http", "ts": "2026-08-15T17:04:00Z",
+        [{"host": "host-a", "kind": "http", "ts": "2026-08-15T17:04:00Z",
           "data": {"url": "https://pesanth.com", "ok": True, "status": 200,
                    "latency_ms": 120.0}}],
     )
@@ -107,7 +107,7 @@ def test_checks_and_containers_are_aliased_with_the_same_name_as_the_card():
         writer,
         "container",
         "2026-08-15",
-        [{"host": "cubebox", "kind": "container", "ts": "2026-08-15T17:04:00Z",
+        [{"host": "host-a", "kind": "container", "ts": "2026-08-15T17:04:00Z",
           "data": {"id": "aaa", "state": "running"}}],
     )
 
@@ -116,13 +116,13 @@ def test_checks_and_containers_are_aliased_with_the_same_name_as_the_card():
 
     assert status["checks"][0]["host"] == alias
     assert status["containers"][0]["host"] == alias
-    assert "cubebox" not in json.dumps(status)
+    assert "host-a" not in json.dumps(status)
 
 
 def test_the_private_view_keeps_everything():
     host = _one_host(view=PublicView(enabled=False))
 
-    assert host["host"] == "cubebox"
+    assert host["host"] == "host-a"
     assert host["process_count"] == 381
     assert host["uptime_label"] == "9.02 d"
 
@@ -135,11 +135,11 @@ def test_the_default_is_redacted_because_a_missing_setting_must_fail_closed():
 
 def test_aliases_parse_from_one_environment_string():
     view = PublicView.from_env(
-        {"SENTINEL_HOST_ALIASES": "cubebox=workstation-01, G7-Server=edge-01, junk"}
+        {"SENTINEL_HOST_ALIASES": "host-a=workstation-01, host-b=edge-01, junk"}
     )
 
-    assert view.alias("cubebox") == "workstation-01"
-    assert view.alias("g7-server") == "edge-01"
+    assert view.alias("host-a") == "workstation-01"
+    assert view.alias("host-b") == "edge-01"
 
 
 def test_an_unreadable_lag_serves_live_rather_than_refusing_to_serve():
@@ -150,14 +150,14 @@ def test_an_unreadable_lag_serves_live_rather_than_refusing_to_serve():
 
 def test_both_the_page_and_the_api_are_redacted_by_default():
     writer = FakeWriter()
-    _write(writer, "system", "2026-08-15", [_system("cubebox", "2026-08-15T17:04:50Z")])
+    _write(writer, "system", "2026-08-15", [_system("host-a", "2026-08-15T17:04:50Z")])
     client = create_app(Archive(writer, ROOT)).test_client()
 
     page = client.get("/")
     api = client.get("/api/status")
 
-    assert b"cubebox" not in page.data
-    assert b"cubebox" not in api.data
+    assert b"host-a" not in page.data
+    assert b"host-a" not in api.data
     assert api.get_json()["public"] is True
 
 

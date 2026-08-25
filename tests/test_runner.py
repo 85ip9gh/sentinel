@@ -18,7 +18,7 @@ class Clock:
 
 
 def _config(**overrides):
-    env = {"SENTINEL_HOST": "cubebox", "SENTINEL_ROLE": "workstation"}
+    env = {"SENTINEL_HOST": "host-a", "SENTINEL_ROLE": "workstation"}
     env.update(overrides)
     return Config.from_env(env)
 
@@ -47,7 +47,7 @@ def test_readings_carry_the_host_identity():
     runner.cycle()
     _, key, payload = publisher.sent[0]
 
-    assert key == b"cubebox"
+    assert key == b"host-a"
     assert json.loads(payload)["role"] == "workstation"
 
 

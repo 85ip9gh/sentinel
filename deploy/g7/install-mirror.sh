@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Install the Sentinel dashboard mirror on the always-on host.
 #
-#   sudo deploy/g7/install-mirror.sh --upstream http://100.125.224.124:8088/api/status
+#   sudo deploy/g7/install-mirror.sh --upstream http://100.100.100.100:8088/api/status
 #
 # The mirror serves the public page from a host that does not get switched off,
 # so the site no longer goes dark with the workstation that holds the archive.

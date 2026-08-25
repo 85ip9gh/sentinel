@@ -25,7 +25,7 @@ def _config(**overrides):
     return SinkConfig.from_env(env)
 
 
-def _reading(host="g7-server", ts="2026-08-15T17:00:00Z", kind="system"):
+def _reading(host="host-b", ts="2026-08-15T17:00:00Z", kind="system"):
     return json.dumps({"schema": 1, "host": host, "role": "server", "kind": kind, "ts": ts, "data": {}})
 
 
@@ -112,7 +112,7 @@ def test_a_failed_write_leaves_the_offsets_uncommitted():
 def test_a_reading_with_no_usable_timestamp_is_filed_not_dropped():
     consumer = FakeConsumer(
         [
-            FakeMessage("sentinel.system", '{"host":"g7-server"}'),
+            FakeMessage("sentinel.system", '{"host":"host-b"}'),
             FakeMessage("sentinel.system", _reading()),
         ]
     )

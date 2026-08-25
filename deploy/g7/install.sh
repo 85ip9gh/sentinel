@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Install the Sentinel collector on a Linux host as a systemd service.
 #
-#   sudo deploy/g7/install.sh --bootstrap 100.125.224.124:9094 --role server
+#   sudo deploy/g7/install.sh --bootstrap 100.100.100.100:9094 --role server
 #
 # Idempotent: re-running updates the code and the environment file, then
 # restarts the service.

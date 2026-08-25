@@ -19,7 +19,7 @@ def test_kind_comes_from_the_topic_name(topic, expected):
 
 
 def test_the_partition_is_the_reading_own_date_not_arrival():
-    payload = '{"ts":"2026-08-14T23:59:59Z","host":"g7-server"}'
+    payload = '{"ts":"2026-08-14T23:59:59Z","host":"host-b"}'
     assert event_date(payload) == "2026-08-14"
 
 

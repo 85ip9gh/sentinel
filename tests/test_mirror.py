@@ -90,13 +90,13 @@ def test_a_failure_never_publishes_the_address_it_failed_to_reach(tmp_path):
 
     def refuse():
         raise ConnectionError(
-            "HTTPConnectionPool(host='100.125.224.124', port=8088): timed out"
+            "HTTPConnectionPool(host='100.100.100.100', port=8088): timed out"
         )
 
     upstream = _upstream(tmp_path, refuse)
     upstream.refresh()
 
-    assert "100.125.224.124" not in json.dumps(upstream.status())
+    assert "100.100.100.100" not in json.dumps(upstream.status())
 
 
 def test_the_cache_survives_a_restart_while_the_upstream_is_down(tmp_path):
